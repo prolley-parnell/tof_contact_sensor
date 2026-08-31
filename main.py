@@ -52,15 +52,27 @@ def fit_curve_to_data(calibration_samples_dict: dict):
     polynomial = {}
     for sensor, measurement_list in calibration_samples_dict.items():
         data_array = np.array(measurement_list)
-        data_array_without_na = data_array[~np.isnan(data_array[:, 1]), :]
+
+        count = data_array[:,1]
+        data_array_without_na = data_array[~np.isnan(count), :]
+        true_dist = data_array_without_na[:,0]
+        count = data_array_without_na[:,1]
 
         if len(data_array_without_na) > 4:
-            p = np.polyfit(data_array_without_na[0], data_array_without_na[1], 3)
+            p = np.polyfit(count, true_dist, 1)
             polynomial[sensor] = p
         else:
             polynomial[sensor] = []
 
     return polynomial
+
+def plot_polynomial(ax, polynomial_dict: dict):
+    ax.clear()
+    for i, (sensor, p) in enumerate(polynomial_dict.items()):
+        y_data = range(10, 2000)
+        x_data = np.polyval(p, y_data)
+        ax.semilogy(x_data, y_data, label=sensor)
+
 
 def plot_error(ax, polynomial_dict:dict, input_reading: dict, real_distance: int):
 
@@ -113,7 +125,7 @@ def main():
 
     # ---------------- Matplotlib Setup ----------------
     plt.ion()
-    fig, (cal, err) = plt.subplots(2, figsize=(14, 9))
+    fig, (cal, err, poly) = plt.subplots(3, figsize=(14, 9))
 
     # Create animation (blit=False is required for 3D axis clear/redraw)
     calibration_samples = {}
@@ -201,6 +213,7 @@ def main():
 
                     if polynomial_data:
                         plot_error(err, polynomial_data, distances_dict, dist_int)
+                        plot_polynomial(poly, polynomial_data)
 
         plot_count(cal, calibration_samples)
         plt.pause(0.01)
