@@ -41,9 +41,9 @@ void setup() {
     }
   }
   
-  Serial.println("System Ready.");
-  Serial.println("Commands:");
-  Serial.println("  'r' = Read distance (mm)");
+  // Serial.println("System Ready.");
+  // Serial.println("Commands:");
+  // Serial.println("  'r' = Read distance (mm)");
 }
 
 void loop() {
