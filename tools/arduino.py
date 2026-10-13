@@ -79,8 +79,9 @@ class Arduino:
             raise e
 
     def _read_sensor_count(self) -> dict | Exception:
-        """ When the serial buffer is available, read the buffer and ASSUME it is for the sensor """
-        # TODO: This will change if reading any values from the servo motors
+        """ When the serial buffer is available, read the buffer and ASSUME it is for the sensor.
+         Dict is empty for the first comm with the sensor. """
+        # TODO: This assumption will change if reading any values from the servo motors
         # 2. Read response
         try:
             if self.ser.in_waiting > 0 or self.ser.readable():
@@ -91,6 +92,7 @@ class Arduino:
                 raise Exception("Serial is not readable")
         except Exception as e:
             print(f"Serial Read Error: {traceback.print_tb(e.__traceback__)}")
+            raise e
 
 
     def read_sensor_mm(self) -> dict | None:

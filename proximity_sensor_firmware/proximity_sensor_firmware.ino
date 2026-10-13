@@ -128,8 +128,11 @@ void initVCNL(int side, int index) {
   writeVCNLReg(VCNL_PS_CONF1, 0x0283); //Byte low = 10000011 Power on, enable bias circuit (PS_ON), Byte high = 00000010
   delay(10);
   writeVCNLReg(VCNL_PS_CONF2, 0xC000); // Byte low = 00000000 PS_Period = 10ms, PS_Pers = 1, PS_INT = interrupt disable, PS_SMART_PERS = disable smart persistence, PS_ST = PS start
-  writeVCNLReg(VCNL_PS_CONF3, 0x1668); // Byte low = 01001000 PS_AF = Enable force mode, PS_TRIG = 0, no force trigger, PS_FORCENUM = one detect cycle, PS_SP_INT = disable sunlight protection
-
+  // Byte high 11000000 = C0, PS_IT = 8T
+  // writeVCNLReg(VCNL_PS_CONF2, 0xC000); // Byte low = 00000000 PS_Period = 10ms, PS_Pers = 1, PS_INT = interrupt disable, PS_SMART_PERS = disable smart persistence, PS_ST = PS start, PS_IT = 2T
+  
+  writeVCNLReg(VCNL_PS_CONF3, 0x1368); // Byte low = 01001000 PS_AF = Enable force mode, PS_TRIG = 0, no force trigger, PS_FORCENUM = one detect cycle, PS_SP_INT = disable sunlight protection
+  // writeVCNLReg(VCNL_PS_CONF3, 0x1368); // Byte low = 01001000 PS_AF = Enable force mode, PS_TRIG = 0, no force trigger, PS_FORCENUM = one detect cycle, PS_SP_INT = disable sunlight protection
 }
 
 void disableAllSwitches() { // For one side only- whichever is active
@@ -138,7 +141,7 @@ void disableAllSwitches() { // For one side only- whichever is active
 }
 
 uint16_t readProximity() { //Assumes the correct sensor has already been activated by selectChannel
-  writeVCNLReg(VCNL_PS_CONF3, 0x1668); //  Data byte high 0x16 which is 00010110 = Set I_VCSEL to 18mA, and set PS output to 16 bits
+  writeVCNLReg(VCNL_PS_CONF3, 0x1268); //  Data byte high 0x16 which is 00010110 = Set I_VCSEL to 18mA, and set PS output to 16 bits
   // Data byte low 0110100 PS_AF = Force mode, PS_TRIG = 1 = Trigger one time cycle (pull high), PS_FORCENUM = 0 = Detect 1 cycle after trigger, PS_SP_INT = 1 = PS Sunlight protect
   delay(5);
   return readVCNLReg(VCNL_PS_DATA);

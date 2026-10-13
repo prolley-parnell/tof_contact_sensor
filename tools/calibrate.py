@@ -2,6 +2,7 @@
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.optimize import curve_fit
 
 class CalibParams:
     def __init__(self, calibration_args_path: str):
@@ -37,63 +38,84 @@ class CalibParams:
                     measured_count = count_measure
                 else:
                     raise Exception("Count measure must be a dict or numpy array")
-                distance_dict[sensor_id] = np.polyval(p, measured_count)
+                # distance_dict[sensor_id] = np.polyval(p, measured_count)
+                # distance_dict[sensor_id] = self.func(measured_count, *p)
+                distance_dict[sensor_id] = self.piecewise_linear(measured_count, *p)
 
         if not distance_dict:
             raise Exception("No calibration parameters")
         else:
             return distance_dict
 
+    @staticmethod
+    def curve(x, a, b, c):
+        return a * np.exp(-b * x) + c
+
+    @staticmethod
+    def piecewise_linear(x, x0, y0, k1, k2):
+        return np.piecewise(x, [x < x0], [lambda x: k1 * x + y0 - k1 * x0, lambda x: k2 * x + y0 - k2 * x0])
+
+    # @staticmethod
+    # def piecewise_linear(x, x0, y0, a, b, c, k2):
+        # return np.piecewise(x, [x < x0], [lambda x: curve(x, a, b, c), lambda x: k2 * x + y0 - k2 * x0])
+
+
+    def fit_curve_to_data(self, calibration_samples_dict: dict):
+        # Each key is the name of the sensor
+        # The dict array that follows is the values for the polynomial, highest value first
+
+        polynomial = {}
+        for sensor, measurement_list in calibration_samples_dict.items():
+            data_array = np.array(measurement_list)
+
+            count = data_array[:, 1]
+            data_array_without_na = data_array[~np.isnan(count), :]
+            true_dist = data_array_without_na[:, 0]
+            count = data_array_without_na[:, 1]
+
+            if len(data_array_without_na) > 4:
+                # p = np.polyfit(count, true_dist, 1)
+
+                # p0 = [0.1, 0.5, 100]  # this is a mandatory initial guess
+                # popt, pcov = curve_fit(self.func, count, true_dist, p0)
+
+                p0 = np.array([455.48, 20.64, -0.0684, -0.0183], dtype=np.float64)
+                popt, pcov = curve_fit(self.piecewise_linear, count, true_dist, p0)
+                print(popt)
+                # polynomial[sensor] = p
+                polynomial[sensor] = popt
+            else:
+                polynomial[sensor] = []
+
+        return polynomial
+
 # ---------------- Use Calibration Params --------------
 def read_pickle_dict(calibration_args_path: str) -> dict | Exception:
     with open(calibration_args_path, "rb") as file:
         try:
-            polynomial_data = pickle.load(file)
-            if isinstance(polynomial_data, dict):
-                return polynomial_data
+            dict_data = pickle.load(file)
+            if isinstance(dict_data, dict):
+                return dict_data
             else:
                 return Exception("Pickle returned something that's not a dictionary")
         except Exception as e:
             print(f"File Read Error: {e}")
             return e
 
-def write_pickle_dict(calibration_args_path: str, calibration_params: dict) -> None | Exception:
+def write_pickle_dict(calibration_args_path: str, dict_params: dict) -> None | Exception:
     with open(calibration_args_path, "wb") as file:
         try:
-            pickle.dump(calibration_params, file)
+            pickle.dump(dict_params, file)
         except Exception as e:
             return e
 
 
 
+
+
 # ---------------- Calibration Plotting ----------------
 
-def fit_curve_to_data(calibration_samples_dict: dict):
-    #Each key is the name of the sensor
-    #The dict array that follows is the values for the polynomial, highest value first
-
-    polynomial = {}
-    for sensor, measurement_list in calibration_samples_dict.items():
-        data_array = np.array(measurement_list)
-
-        count = data_array[:,1]
-        data_array_without_na = data_array[~np.isnan(count), :]
-        true_dist = data_array_without_na[:,0]
-        count = data_array_without_na[:,1]
-
-        if len(data_array_without_na) > 4:
-            p = np.polyfit(count, true_dist, 2)
-            # p = np.polynomial.Polynomial.fit(count, true_dist, 2)
-            # p0 = [-max(true_dist), np.median(count), 1, min(true_dist)]  # this is an mandatory initial guess
-            # popt, pcov = curve_fit(sigmoid, count, true_dist, p0, method='lm')
-
-            polynomial[sensor] = p
-        else:
-            polynomial[sensor] = []
-
-    return polynomial
-
-def plot_count(ax, calibration_dict: dict):
+def plot_line(ax, calibration_dict: dict):
     # Extract plottable data
     ax.clear()
     for sensor_id, samples in calibration_dict.items():
@@ -108,16 +130,38 @@ def plot_count(ax, calibration_dict: dict):
             average = np.median(all_value)
             y_data.append(average)
 
-        ax.semilogy(x_data, y_data, label=sensor_id)
+        # ax.semilogy(x_data, y_data, label=sensor_id)
+        ax.plot(x_data, y_data, label=sensor_id)
+
+    ax.legend()
+
+def plot_count(ax, calibration_dict: dict):
+    # Extract plottable data
+    ax.clear()
+    for sensor_id, samples in calibration_dict.items():
+        data = np.array(samples)
+        # unique, unique_inverse = np.unique(data[:, 0], sorted=True,
+        #                                    return_inverse=True)  # Find the unique distances and identify where there are repetitions
+
+        # x_data = unique
+        # y_data = []
+        # for index, distance in enumerate(unique):
+        #     all_value = data[unique_inverse == index, 1]
+        #     average = np.median(all_value)
+        #     y_data.append(average)
+
+        # ax.semilogy(x_data, y_data, label=sensor_id)
+        ax.scatter(data[:, 0], data[:, 1], label=sensor_id)
 
     ax.legend()
 
 def plot_polynomial(ax, calib_obj: CalibParams):
     ax.clear()
-    y_data = np.array(range(10, 20000))
+    y_data = np.array(range(10, 3000))
     dist_dict = calib_obj.count_to_dist_mm(y_data)
     for i, (sensor, x_data) in enumerate(dist_dict.items()):
-        ax.semilogy(x_data, y_data, label=sensor)
+        # ax.semilogy(x_data, y_data, label=sensor)
+        ax.plot(x_data, y_data, label=sensor)
 
 
 def plot_error(ax: plt.Axes, calib_obj: CalibParams, input_reading: dict, real_distance: int):
@@ -129,9 +173,9 @@ def plot_error(ax: plt.Axes, calib_obj: CalibParams, input_reading: dict, real_d
 
 
 # ---------------- Calibration Loop ----------------
-def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial_args.pkl"):
+def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial_args.pkl", baud_rate=115200):
     # Set up Arduino connection
-    gripper_controller = arduino.Arduino()
+    gripper_controller = arduino.Arduino(baud_rate)
     calib_object = CalibParams(polynomial_file)
 
 
@@ -140,6 +184,7 @@ def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial
     fig, (cal, err, poly) = plt.subplots(3, figsize=(14, 9))
 
     calibration_measurements = {}
+    calibration_params = {}
 
     quit_flag = False
     try:
@@ -175,7 +220,7 @@ def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial
 
                 elif dist == "rc":
                     print("Reading calibration variables...")
-                    polynomial_data = calib_object.get_calibration_params(None)
+                    calibration_params = calib_object.get_calibration_params(None)
 
                 elif dist == "d":
                     print("Dropping the last sample...")
@@ -185,8 +230,8 @@ def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial
                 elif dist == "f":
                     print("Fit the curve to the calibration data...")
                     if len(calibration_measurements.values()) > 4:
-                        polynomial_data = fit_curve_to_data(calibration_measurements)
-                        calib_object.set_calibration_params(polynomial_data)
+                        calibration_params = calib_object.fit_curve_to_data(calibration_measurements)
+                        calib_object.set_calibration_params(calibration_params)
 
 
                 else:
@@ -199,7 +244,7 @@ def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial
                                 calibration_measurements[sensor] = []
                             calibration_measurements[sensor].append([dist_int, count])
 
-                    if polynomial_data:
+                    if calibration_params:
                         plot_error(err, calib_object, current_count, dist_int)
                         plot_polynomial(poly, calib_object)
 
