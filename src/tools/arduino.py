@@ -7,7 +7,7 @@ from tools.calibrate import CalibParams
 import sys
 
 class Arduino:
-    calibrator = CalibParams | None
+    calibrator = None
 
     def __init__(self, baud_rate=115200):
         """ Initialise the serial connection with the Arduino """
@@ -69,11 +69,20 @@ class Arduino:
         """ Set up the calibration tool class with the calib params found at the file path. The file should be ``.pkl`` """
         #Read the parameters from file to the class
         self.calibrator = CalibParams(calibration_file_path)
+        # self.calibrator.get_calibration_params(calibration_file_path)
 
     def request_read_sensor(self) -> None | Exception:
         """ Send the 'r' char to the Arduino, prompting it to return the sensor reading count. """
         try:
             self.ser.write(b'r\n')
+        except Exception as e:
+            print(f"Serial Write Error: {e}")
+            raise e
+
+    def tare(self) -> None | Exception:
+        """ Send a serial command to the arduino to zero the tof sensors. """
+        try:
+            self.ser.write(b't\n')
         except Exception as e:
             print(f"Serial Write Error: {e}")
             raise e

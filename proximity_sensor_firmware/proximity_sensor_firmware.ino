@@ -54,6 +54,9 @@ void loop() {
     if (input.equalsIgnoreCase("r")) {
       readAllSensors();
     }
+    if (input.equalsIgnoreCase("t")) {
+      tareSensor();
+    }
   }
 }
 
@@ -87,6 +90,16 @@ void readAllSensors() {
     }
   }
   Serial.println();
+}
+
+void tareSensor() {
+  for (int side = 0; side < 2; side++)  {
+    for (int index = 0; index < 16; index++) {
+        selectChannel(side, index, 1);
+        writeVCNLReg(VCNL_PS_CANC, 0x0000); // Reset the tare
+
+    }
+  }
 }
 
 // void enableSunlightCancel() {
@@ -125,14 +138,30 @@ bool selectChannel(int finger, int sensorNum, bool state) { // This initialises 
 void initVCNL(int side, int index) {
   selectChannel(side, index, 1);
   writeVCNLReg(VCNL_PS_CANC, 0x0000); // Reset the tare
-  writeVCNLReg(VCNL_PS_CONF1, 0x0283); //Byte low = 10000011 Power on, enable bias circuit (PS_ON), Byte high = 00000010
+  // Must set PS_ON = 1 then PS_CAL = 1
+  // Byte high: 00000010 (0x00)
+  // Byte low: 00000011 (0x03) Set PS_ON
+  writeVCNLReg(VCNL_PS_CONF1, 0x0003);
+
+  // Byte high: 00000010 (0x02) Set power on
+  // Byte low: 10000011 (0x83) Set PS_CAL and enable bias circuit
+  writeVCNLReg(VCNL_PS_CONF1, 0x0283);
   delay(10);
-  writeVCNLReg(VCNL_PS_CONF2, 0xC000); // Byte low = 00000000 PS_Period = 10ms, PS_Pers = 1, PS_INT = interrupt disable, PS_SMART_PERS = disable smart persistence, PS_ST = PS start
-  // Byte high 11000000 = C0, PS_IT = 8T
+
+  // Enable PS_AF (PS_CONF3_L)
+  // Byte high: 00010100 (0x14) No sunlight Cancellation, PS Output 16 bits, I_VCSEL = 14mA
+//   Byte low: 01001000 (0x48) PS_AF = 1, PS_Trig not set yet, Detect 1 cycle after trigger, Disable Sunlight Protect INT setting.
+//   writeVCNLReg(VCNL_PS_CONF3, 0x1348);
+
+//   Byte low: 01011000 (0x58) PS_AF = 1, PS_Trig not set yet, Detect 2 cycles after trigger, Disable Sunlight Protect INT setting.
+  writeVCNLReg(VCNL_PS_CONF3, 0x1458);
+
+  // Set up current limitations
+  // Byte high 01001000 (0x48) PS_IT = 2T, Multipulse = 1, ITB = 50µs, Disable high gain mode
+  // Byte low 10000000 (0x80) Period = 40ms, Interrupt persistence = 1, Interrupt disabled, smart persistence disabled, Sensor started
+  writeVCNLReg(VCNL_PS_CONF2, 0x4880);
   // writeVCNLReg(VCNL_PS_CONF2, 0xC000); // Byte low = 00000000 PS_Period = 10ms, PS_Pers = 1, PS_INT = interrupt disable, PS_SMART_PERS = disable smart persistence, PS_ST = PS start, PS_IT = 2T
-  
-  writeVCNLReg(VCNL_PS_CONF3, 0x1368); // Byte low = 01001000 PS_AF = Enable force mode, PS_TRIG = 0, no force trigger, PS_FORCENUM = one detect cycle, PS_SP_INT = disable sunlight protection
-  // writeVCNLReg(VCNL_PS_CONF3, 0x1368); // Byte low = 01001000 PS_AF = Enable force mode, PS_TRIG = 0, no force trigger, PS_FORCENUM = one detect cycle, PS_SP_INT = disable sunlight protection
+
 }
 
 void disableAllSwitches() { // For one side only- whichever is active
@@ -141,10 +170,15 @@ void disableAllSwitches() { // For one side only- whichever is active
 }
 
 uint16_t readProximity() { //Assumes the correct sensor has already been activated by selectChannel
-  writeVCNLReg(VCNL_PS_CONF3, 0x1268); //  Data byte high 0x16 which is 00010110 = Set I_VCSEL to 18mA, and set PS output to 16 bits
-  // Data byte low 0110100 PS_AF = Force mode, PS_TRIG = 1 = Trigger one time cycle (pull high), PS_FORCENUM = 0 = Detect 1 cycle after trigger, PS_SP_INT = 1 = PS Sunlight protect
-  delay(5);
-  return readVCNLReg(VCNL_PS_DATA);
+  // Set the sensor start
+  // Conf 3
+  // Enable PS_AF (PS_CONF3_L)
+
+  // Byte high: 00010100 (0x14) No sunlight Cancellation, PS Output 16 bits, I_VCSEL = 14mA - Brighter is better for greater distances
+  // 01111000 (0x78) PS_AF = 1, PS_Trig Set, Detect 2 cycle after trigger, Disable Sunlight Protect INT setting.
+    writeVCNLReg(VCNL_PS_CONF3, 0x1478);
+    delay(5);
+    return readVCNLReg(VCNL_PS_DATA);
 }
 
 bool writeVCNLReg(uint8_t reg, uint16_t data) {
@@ -158,7 +192,8 @@ bool writeVCNLReg(uint8_t reg, uint16_t data) {
 uint16_t readVCNLReg(uint8_t reg) { // Write to device
   Wire.beginTransmission(VCNL_ADDR);
   Wire.write(reg);
-  if (Wire.endTransmission(false) != 0) return 65535;
+  if (Wire.endTransmission(false) != 0) return 65535; // endTransmission transmits the bytes queued by write()
+  // If the line cannot be held open by transmitting "false" and the return of 0 then return max count
 
   Wire.requestFrom(VCNL_ADDR, 2); // If the transmission did not fail, read 2 bytes
   unsigned long startTime = millis();
