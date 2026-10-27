@@ -215,6 +215,7 @@ def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial
             elif dist == "rm":
                 print("Reading measurements...")
                 calibration_measurements = read_pickle_dict(calibration_file)
+                print(calibration_measurements)
 
             elif dist == "sc":
                 print("Saving calibration variables...")
@@ -283,7 +284,7 @@ if __name__=="__main__":
     UPDATE_INTERVAL = 100
 
     # ---------------- Data Parsing ----------------
-    CALIBRATION_FILE = "./calibration_samples.pkl"
+    CALIBRATION_FILE = "./calibration_collate.pkl"
     POLYNOMIAL_FILE = "./polynomial_args.pkl"
 
     main(CALIBRATION_FILE, POLYNOMIAL_FILE)

@@ -3,8 +3,8 @@ import traceback
 import serial
 import serial.tools.list_ports
 import numpy as np
-from tools.calibrate import CalibParams
-import sys
+from calibrate import CalibParams
+
 
 class Arduino:
     calibrator = None
