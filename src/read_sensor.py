@@ -31,6 +31,6 @@ if __name__=="__main__":
     BAUD_RATE = 115200
 
     # ---------------- Data Parsing ----------------
-    CALIBRATION_FILE = "../polynomial_args.pkl"
+    CALIBRATION_FILE = "../config/polynomial_args.pkl"
 
     main(CALIBRATION_FILE, BAUD_RATE)

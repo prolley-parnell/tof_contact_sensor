@@ -26,7 +26,7 @@ def plot_line(ax, calibration_dict: dict):
 
     ax.legend()
 
-def plot_count(ax, calibration_dict: dict):
+def plot_measure(ax, calibration_dict: dict):
     # Extract plottable data
     ax.clear()
     for sensor_id, samples in calibration_dict.items():
@@ -36,7 +36,7 @@ def plot_count(ax, calibration_dict: dict):
     ax.set_yscale('log')
     ax.legend()
 
-def plot_polynomial(ax, calib_obj: CalibParams):
+def plot_calibration_curve(ax, calib_obj: CalibParams):
     ax.clear()
     y_data = np.array(range(10, 3000))
     dist_dict = calib_obj.count_to_dist_mm(y_data)
@@ -45,7 +45,7 @@ def plot_polynomial(ax, calib_obj: CalibParams):
         ax.plot(x_data, y_data, label=sensor)
 
 
-def plot_error(ax: plt.Axes, calib_obj: CalibParams, input_reading: dict, real_distance: int):
+def plot_error_bar(ax: plt.Axes, calib_obj: CalibParams, input_reading: dict, real_distance: int):
     ax.clear()
     dist_dict = calib_obj.count_to_dist_mm(input_reading)
     for i, (sensor_id, dist) in enumerate(dist_dict.items()):
@@ -54,10 +54,55 @@ def plot_error(ax: plt.Axes, calib_obj: CalibParams, input_reading: dict, real_d
 
 
 # ---------------- Calibration Loop ----------------
-def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial_args.pkl", baud_rate=115200):
+def main(calibration_measure_file: str="calibration_samples.pkl", calibration_param_file: str="polynomial_args.pkl", baud_rate: int=115200):
+
+    """
+        Runs a loop that allows the user to input the distance, and add it to an array of measurements that pair the count to the true distance for each sensor.
+        Parameters
+        ----------
+        calibration_measure_file: `str`
+            The relative path to the calibration file (defaults to "calibration_samples.pkl"), string type
+            If calibration_file is set to None, the output is shown in the raw count value rather than mm.
+        calibration_param_file: `str`
+            The relative path to the calibration parameter file (defaults to "polynomial_args.pkl"), string type
+        baud_rate: `int`
+            The serial port baud rate (defaults to 115200) for the Arduino device
+
+
+        Keyboard Input
+        -----
+            int - Any integer value
+                This is interpreted as the distance from a flat surface that the measurement has been taken at.
+
+            "q" - Quit
+                Close the script without saving.
+
+            "sm" - Save measurements
+                Save the count-distance pairs as a dictionary in a ".pkl" file, at the path specified in the main function.
+
+            "rm" - Read measurements
+                The dictionary previously saved in the file is loaded into the script.
+
+            "sc" - Save calibration variables
+                The parameters used in the calibration curve are saved per sensor. Must have "fit" the curve before saving.
+
+            "rc" - Read calibration variables
+                The dictionary previously saved in the file is loaded into the script with the parameters for the function per sensor.
+
+            "d" - Drop the last measurement
+                Remove from the array the last distance saved. Helpful if you type the wrong distance in.
+
+            "f" - Fit the curve to the calibration data
+                Fit the curve piecewise, logarithmic then linear.
+                f(x, a, b, k2, y0, x0) => [a * np.log10(x) + b, k2 * x + y0 - k2 * x0]
+
+            "t" - Zero the sensor
+                Sends the command over serial to the Arduino to re-zero the sensors. This happens automatically at start up of the Arduino.
+    """
+
     # Set up Arduino connection
     gripper_controller = Arduino(baud_rate)
-    calib_object = CalibParams(polynomial_file)
+    calib_object = CalibParams(calibration_param_file)
 
 
     # ---------------- Matplotlib Setup ----------------
@@ -80,12 +125,11 @@ def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial
 
             elif dist == "sm":
                 print("Saving measurements...")
-                write_pickle_dict(calibration_file, calibration_measurements)
+                write_pickle_dict(calibration_measure_file, calibration_measurements)
 
             elif dist == "rm":
                 print("Reading measurements...")
-                calibration_measurements = read_pickle_dict(calibration_file)
-                print(calibration_measurements)
+                calibration_measurements = read_pickle_dict(calibration_measure_file)
 
             elif dist == "sc":
                 print("Saving calibration variables...")
@@ -119,7 +163,7 @@ def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial
                         # 1. Send command to Arduino
                         gripper_controller.request_read_sensor()
                         # 2. Read response
-                        current_count = gripper_controller._read_sensor_count()
+                        current_count = gripper_controller.read_sensor_count()
                         print(current_count)
 
                     except Exception as e:
@@ -133,10 +177,10 @@ def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial
                             calibration_measurements[sensor].append([dist_int, count])
 
                 if calibration_params:
-                    plot_error(err, calib_object, current_count, dist_int)
-                    plot_polynomial(poly, calib_object)
+                    plot_error_bar(err, calib_object, current_count, dist_int)
+                    plot_calibration_curve(poly, calib_object)
 
-            plot_count(cal, calibration_measurements)
+            plot_measure(cal, calibration_measurements)
             plt.pause(0.01)
 
     except KeyboardInterrupt:
@@ -145,15 +189,15 @@ def main(calibration_file="calibration_samples.pkl", polynomial_file="polynomial
     # Cleanup
     gripper_controller.close()
 
+
 if __name__=="__main__":
 
     # ---------------- Configuration ----------------
     BAUD_RATE = 115200
-    # Interval in milliseconds (100ms = 10 Hz)
-    UPDATE_INTERVAL = 100
 
     # ---------------- Data Parsing ----------------
-    CALIBRATION_FILE = "./calibration_collate.pkl"
-    POLYNOMIAL_FILE = "./polynomial_args.pkl"
+    MEASURE_FILE = "./data/calibration_collate.pkl"
+    PARAM_FILE = "./config/polynomial_args.pkl"
 
-    main(CALIBRATION_FILE, POLYNOMIAL_FILE)
+    main(MEASURE_FILE, PARAM_FILE, BAUD_RATE)
+
