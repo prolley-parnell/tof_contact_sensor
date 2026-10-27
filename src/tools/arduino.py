@@ -1,9 +1,8 @@
 import traceback
-
 import serial
 import serial.tools.list_ports
 import numpy as np
-from calibrate import CalibParams
+from . calibrate import CalibParams #Directs to import the file calibrate from the current directory
 
 
 class Arduino:
@@ -65,11 +64,12 @@ class Arduino:
 
         return {}
 
-    def init_sensor_calibration(self, calibration_file_path: str):
+    def init_sensor_calibration(self, calibration_file_path: str | None):
         """ Set up the calibration tool class with the calib params found at the file path. The file should be ``.pkl`` """
         #Read the parameters from file to the class
-        self.calibrator = CalibParams(calibration_file_path)
-        # self.calibrator.get_calibration_params(calibration_file_path)
+        if calibration_file_path is not None:
+            self.calibrator = CalibParams(calibration_file_path)
+            self.calibrator.read_calibration_params(calibration_file_path)
 
     def request_read_sensor(self) -> None | Exception:
         """ Send the 'r' char to the Arduino, prompting it to return the sensor reading count. """
@@ -87,7 +87,7 @@ class Arduino:
             print(f"Serial Write Error: {e}")
             raise e
 
-    def _read_sensor_count(self) -> dict | Exception:
+    def read_sensor_count(self) -> dict | Exception:
         """ When the serial buffer is available, read the buffer and ASSUME it is for the sensor.
          Dict is empty for the first comm with the sensor. """
         # TODO: This assumption will change if reading any values from the servo motors
@@ -110,7 +110,7 @@ class Arduino:
             raise Exception("Calibration parameters not set")
         else:
             try:
-                sensor_count = self._read_sensor_count()
+                sensor_count = self.read_sensor_count()
                 if len(sensor_count) > 0:
                     dist_dict = self.calibrator.count_to_dist_mm(sensor_count)
                     return dist_dict
