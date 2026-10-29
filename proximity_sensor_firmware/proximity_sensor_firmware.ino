@@ -1,12 +1,21 @@
 #include <Wire.h>
 #include <math.h>
+#include <Servo.h>
+
+// --- Computer commands ---
+#define MAX_INPUT_LENGTH 8 // The max number of bytes per command (1 byte per char), if it runs over this length, then the buffer is read in the next loop and will produce incorrect values
+
+// --- Servo Parameters --- 
+
+#define SERVO_MIN 1000
+#define SERVO_MAX 2000
 
 // --- Pin Definitions ---
 //If not in mount use reset pin A3
 // #define SWITCH_RESET_PIN A3
 #define SWITCH_RESET_PIN_1 7
 #define SWITCH_RESET_PIN_2 8
-
+#define SERVO_PIN 6
 
 // --- I2C Addresses ---
 #define VCNL_ADDR      0x60
@@ -22,6 +31,8 @@
 #define VCNL_PS_DATA   0xF8 // Read only from proximity sensor
 #define VCNL_INT_FLAG  0xF9 // Read the interrupt flags
 
+Servo gripper_servo;
+int servo_pos = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -41,6 +52,10 @@ void setup() {
     }
   }
   
+  // Set up the servo motor
+  gripper_servo.attach(SERVO_PIN, SERVO_MIN, SERVO_MAX);
+
+
   // Serial.println("System Ready.");
   // Serial.println("Commands:");
   // Serial.println("  'r' = Read distance (mm)");
@@ -49,15 +64,40 @@ void setup() {
 void loop() {
   if (Serial.available() > 0) {
     String input = Serial.readStringUntil('\n');
-    input.trim();
+    char input[MAX_INPUT_LENGTH + 1]; // Add 1 for the final 0
+    byte size = Serial.readBytes(input, MAX_INPUT_LENGTH);
+    input[size] = 0;
+    
+    char* command = strtok(input, '\n'); // Splits the input using "\n" and returns a pointer to the first instance
 
-    if (input.equalsIgnoreCase("r")) {
-      readAllSensors();
-    }
-    if (input.equalsIgnoreCase("t")) {
-      tareSensor();
+    // Serial.println(command);
+    while (command != NULL){
+      // If the pointer is null, there is no new line
+
+      if (strchr(command, 'm')) {
+        char* separator = strchr(command, ':');
+        if (separator != 0) {
+          ++separator;
+          int position = atoi(separator);
+          setServo(position);
+        }
+      }
+      else if (strchr(command, 'r')) {
+         readAllSensors();
+      }
+      else if (strchr(command, 't')) {
+        tareSensor();
+      }
+      command = strtok(NULL, '\n');
     }
   }
+}
+
+// --- Servo Motor Functions --
+
+void setServo(int position){
+  gripper_servo.write(position);
+  delay(10);
 }
 
 // --- Action Functions ---
@@ -102,18 +142,6 @@ void tareSensor() {
   }
 }
 
-// void enableSunlightCancel() {
-//   Serial.println("Enabling Sunlight Cancellation...");
-//   for (int i = 0; i < 16; i++) {
-//     selectChannel(i, 1);
-//     uint16_t conf3 = readVCNLReg(VCNL_PS_CONF3);
-//     conf3 |= 0xE000;
-//     writeVCNLReg(VCNL_PS_CONF3, conf3);
-//     // disableAllSwitches();
-//     selectChannel(i, 0);
-//   }
-//   Serial.println("Done.");
-// }
 
 // --- Low Level Functions ---
 

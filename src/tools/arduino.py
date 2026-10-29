@@ -120,6 +120,15 @@ class Arduino:
                 print(f"Read Error: {traceback.print_tb(e.__traceback__)}")
                 raise e
 
+    def set_servo_position(self, pos: int) -> None:
+        try:
+            if pos > 9999:
+                raise Exception("Position must be made up of less than 4 bytes (4 digits).")
+            self.ser.write(b'm:%i\n' % pos)
+        except Exception as e:
+            print(f"Write Error: {traceback.print_tb(e.__traceback__)}")
+            raise e
+
     def close(self) -> None:
         """ Close the serial connection """
         if self.ser is not None:
