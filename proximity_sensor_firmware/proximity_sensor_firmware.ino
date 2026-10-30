@@ -54,24 +54,15 @@ void setup() {
   
   // Set up the servo motor
   gripper_servo.attach(SERVO_PIN, SERVO_MIN, SERVO_MAX);
-
-
-  // Serial.println("System Ready.");
-  // Serial.println("Commands:");
-  // Serial.println("  'r' = Read distance (mm)");
 }
 
 void loop() {
   if (Serial.available() > 0) {
-    String input = Serial.readStringUntil('\n');
-    char input[MAX_INPUT_LENGTH + 1]; // Add 1 for the final 0
-    byte size = Serial.readBytes(input, MAX_INPUT_LENGTH);
-    input[size] = 0;
-    
-    char* command = strtok(input, '\n'); // Splits the input using "\n" and returns a pointer to the first instance
+    char command[MAX_INPUT_LENGTH + 1]; // Add 1 for the final 0
+    byte size = Serial.readBytesUntil('\n', command, MAX_INPUT_LENGTH);
+    command[size] = '\0';
 
-    // Serial.println(command);
-    while (command != NULL){
+    if (size != NULL){
       // If the pointer is null, there is no new line
 
       if (strchr(command, 'm')) {
@@ -83,21 +74,20 @@ void loop() {
         }
       }
       else if (strchr(command, 'r')) {
-         readAllSensors();
+        readAllSensors();
       }
       else if (strchr(command, 't')) {
         tareSensor();
       }
-      command = strtok(NULL, '\n');
     }
   }
 }
+
 
 // --- Servo Motor Functions --
 
 void setServo(int position){
   gripper_servo.write(position);
-  delay(10);
 }
 
 // --- Action Functions ---
@@ -178,18 +168,13 @@ void initVCNL(int side, int index) {
 
   // Enable PS_AF (PS_CONF3_L)
   // Byte high: 00010100 (0x14) No sunlight Cancellation, PS Output 16 bits, I_VCSEL = 14mA
-//   Byte low: 01001000 (0x48) PS_AF = 1, PS_Trig not set yet, Detect 1 cycle after trigger, Disable Sunlight Protect INT setting.
-//   writeVCNLReg(VCNL_PS_CONF3, 0x1348);
-
-//   Byte low: 01011000 (0x58) PS_AF = 1, PS_Trig not set yet, Detect 2 cycles after trigger, Disable Sunlight Protect INT setting.
+  // Byte low: 01011000 (0x58) PS_AF = 1, PS_Trig not set yet, Detect 2 cycles after trigger, Disable Sunlight Protect INT setting.
   writeVCNLReg(VCNL_PS_CONF3, 0x1458);
 
   // Set up current limitations
   // Byte high 01001000 (0x48) PS_IT = 2T, Multipulse = 1, ITB = 50µs, Disable high gain mode
   // Byte low 10000000 (0x80) Period = 40ms, Interrupt persistence = 1, Interrupt disabled, smart persistence disabled, Sensor started
   writeVCNLReg(VCNL_PS_CONF2, 0x4880);
-  // writeVCNLReg(VCNL_PS_CONF2, 0xC000); // Byte low = 00000000 PS_Period = 10ms, PS_Pers = 1, PS_INT = interrupt disable, PS_SMART_PERS = disable smart persistence, PS_ST = PS start, PS_IT = 2T
-
 }
 
 void disableAllSwitches() { // For one side only- whichever is active

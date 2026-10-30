@@ -41,7 +41,7 @@ def main(calibration_file="polynomial_samples.pkl", baud_rate=115200):
             print(f"Current servo state: {current_servo_state}")
 
             gripper_controller.set_servo_position(current_servo_state)
-            time.sleep(1)
+            # time.sleep(1)
 
 
     except Exception as e:
